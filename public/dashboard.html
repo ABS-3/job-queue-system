@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Job Queue Dashboard</title>
+  <style>
+    .job-details {
+      margin-left: 20px;
+      font-size: 0.9em;
+      color: #555;
+    }
+    li.job-item {
+  cursor: pointer;
+    }
+
+  </style>
+</head>
+<body>
+  <h1>Jobs</h1>
+  <ul id="jobs"></ul>
+
+  <h1>Workers</h1>
+  <ul id="workers"></ul>
+
+  <h2>Submit a New Job</h2>
+  <form id="jobForm">
+    <label>
+      Job Name:
+      <input type="text" id="jobName" required>
+    </label>
+    <br>
+    <label>
+      Payload (JSON):
+      <textarea id="jobPayload" rows="4" cols="40" required>{"to":"test@example.com"}</textarea>
+    </label>
+    <br>
+    <button type="submit">Enqueue Job</button>
+  </form>
+
+  <h2>Auto Refresh</h2>
+  <button id="toggleRefresh">Pause Auto Refresh</button>
+
+  <script>
+    let refreshInterval = null;
+    let isRefreshing = true;
+
+    async function loadData() {
+      const jobs = await fetch('/jobs').then(r => r.json());
+      const workers = await fetch('/workers').then(r => r.json());
+
+      const jobsList = document.getElementById('jobs');
+      jobsList.innerHTML = '';
+      jobs.forEach(job => {
+  const li = document.createElement('li');
+  li.className = 'job-item';
+  li.textContent = `#${job.id} ${job.name} → ${job.status}`;
+
+  li.addEventListener('click', async () => {
+    try {
+      const logs = await fetch(`/jobs/${job.id}/logs`).then(r => r.json());
+      const attempts = await fetch(`/jobs/${job.id}/attempts`).then(r => r.json());
+
+      const details = document.createElement('div');
+      details.className = 'job-details';
+      details.innerHTML = `
+        <strong>Logs:</strong>
+        <ul>${logs.map(l => `<li>${l.log_message} (${l.created_at})</li>`).join('')}</ul>
+        <strong>Attempts:</strong>
+        <ul>${attempts.map(a => `<li>Attempt ${a.attempt_number}: ${a.status} (${a.created_at})</li>`).join('')}</ul>
+      `;
+
+      // Replace old details if present
+      const oldDetails = li.querySelector('.job-details');
+      if (oldDetails) li.removeChild(oldDetails);
+      li.appendChild(details);
+    } catch (err) {
+      alert("Failed to fetch job details");
+      console.error(err);
+    }
+  });
+
+  jobsList.appendChild(li);
+});
+
+
+      const workersList = document.getElementById('workers');
+      workersList.innerHTML = '';
+      workers.forEach(worker => {
+        const li = document.createElement('li');
+        li.textContent = `${worker.name} → ${worker.status}`;
+        workersList.appendChild(li);
+      });
+    }
+
+    // Handle job submission
+    document.getElementById('jobForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('jobName').value;
+      let payload;
+      try {
+        payload = JSON.parse(document.getElementById('jobPayload').value);
+      } catch (err) {
+        alert("Invalid JSON payload");
+        return;
+      }
+
+      const res = await fetch('/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, payload })
+      });
+      const data = await res.json();
+      alert(`Job submitted: ${JSON.stringify(data)}`);
+      loadData(); // refresh jobs list
+    });
+
+    // Auto refresh toggle
+    function startRefresh() {
+      refreshInterval = setInterval(loadData, 5000);
+    }
+    function stopRefresh() {
+      clearInterval(refreshInterval);
+      refreshInterval = null;
+    }
+
+    document.getElementById('toggleRefresh').addEventListener('click', () => {
+      if (isRefreshing) {
+        stopRefresh();
+        document.getElementById('toggleRefresh').textContent = "Resume Auto Refresh";
+      } else {
+        startRefresh();
+        document.getElementById('toggleRefresh').textContent = "Pause Auto Refresh";
+      }
+      isRefreshing = !isRefreshing;
+    });
+
+    // Initial load + start auto refresh
+    loadData();
+    startRefresh();
+  </script>
+</body>
+</html>
