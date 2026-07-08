@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const { Queue } = require('bullmq');
@@ -5,6 +7,13 @@ const mysql = require('mysql2/promise');
 const path = require('path');
 
 const app = express();
+
+const dbPool = mysql.createPool({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME
+});
 
 app.use(cors());
 app.use(express.json());
