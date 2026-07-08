@@ -1,8 +1,17 @@
+require('dotenv').config();
+
 const { Worker } = require('bullmq');
 const mysql = require('mysql2/promise');
 const os = require('os');
 
 const workerName = `${os.hostname()}-pid${process.pid}`;
+
+const dbPool = mysql.createPool({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME
+});
 
 async function connectDB() {
   return mysql.createConnection({
